@@ -56,18 +56,18 @@ void setup()
   bool mpu6050Detected = identifyMPU6050();
   if (mpu6050Detected)
   {
-    Serial.println("MPU6050 detected!");
+    Serial.println("# MPU6050 detected!");
   }
   else
   {
-    Serial.println("MPU6050 not detected.");
+    Serial.println("# MPU6050 not detected.");
     while (1)
       delay(1000); // Stop execution if MPU6050 is not detected
   }
 
   if (!mpu.begin())
   {
-    Serial.println("Failed to find MPU6050 chip");
+    Serial.println("# Failed to find MPU6050 chip");
     while (1)
       delay(1000); // Stop execution if MPU6050 initialization fails
   }
@@ -76,10 +76,14 @@ void setup()
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
 
-  // Serial.println("Ready. Format: AccelX, AccelY, AccelZ, GyroX, GyroY, GyroZ, ms");
+  // Header row — your Python script will look for this
+  Serial.println("# RakshaBand IMU Logger v1");
+  Serial.println("# sensor=ICM-42670-P accel_range=8g gyro_range=500dps rate=100Hz");
+  Serial.println("t_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps");
 }
 
 const float G_TO_MS2 = 9.80665f; // Conversion factor from g to m/s^2
+
 void loop()
 {
   // put your main code here, to run repeatedly:
@@ -123,7 +127,7 @@ void loop()
       {
         state = AWAITING_FOR_IMPACT;
         impact_window_remaining = IMPACT_WINDOW_SAMPLES;
-        Serial.println("Free fall detected, awaiting impact...");
+        // Serial.println("# Free fall detected, awaiting impact...");
       }
     }
     else
@@ -141,7 +145,7 @@ void loop()
       state = FALL_DETECTED;
       post_fall_remaining = POST_FALL_HOLD_SAMPLES;
       digitalWrite(LED_PIN, HIGH); // Turn on LED to indicate fall detected
-      // Serial.printf("Fall candidate detected, peak ~%0.2fg\n", accelMagnitude);
+      // Serial.printf("# Fall candidate detected, peak ~%0.2fg\n", accelMagnitude);
     }
     else
     {
@@ -150,7 +154,7 @@ void loop()
       {
         state = IDLE; // No impact detected within window, reset
         freefall_run = 0;
-        // Serial.println("No impact detected, resetting...");
+        // Serial.println("# No impact detected, resetting...");
       }
     }
   }
@@ -164,7 +168,7 @@ void loop()
       state = IDLE; // Reset after hold period
       freefall_run = 0;
       digitalWrite(LED_PIN, LOW); // Turn off LED
-      // Serial.println("Resetting after fall detection...");
+      // Serial.println("# Resetting after fall detection...");
     }
   }
   break;
@@ -172,7 +176,7 @@ void loop()
     break;
   }
 
-  // Serial.printf("%.3f,%.3f,%.3f\n", accelX, accelY, accelZ);
+  // Serial.printf("# %.3f,%.3f,%.3f\n", accelX, accelY, accelZ);
 
   float gyroX = g.gyro.x * 57.29578f;
   float gyroY = g.gyro.y * 57.29578f;
