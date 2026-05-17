@@ -37,6 +37,7 @@ def plot_session(df, title="Session"):
     # Middle: 3-axis gyroscope
     axes[1].plot(df["t_s"], df["gx_dps"], label="gx", linewidth=0.8)
     axes[1].plot(df["t_s"], df["gy_dps"], label="gy", linewidth=0.8)
+    
     axes[1].plot(df["t_s"], df["gz_dps"], label="gz", linewidth=0.8)
     axes[1].set_ylabel("Angular rate (°/s)")
     axes[1].legend(loc="upper right")

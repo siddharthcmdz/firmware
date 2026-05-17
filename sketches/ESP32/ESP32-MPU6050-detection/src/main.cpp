@@ -6,6 +6,8 @@
 const int SDA_PIN = 21; // your Elegoo ESP32's I²C pins
 const int SCL_PIN = 22;
 const int LED_PIN = 2; // onboard LED pin (optional, for status indication)
+const int BUZZER_PIN = 13;
+const int SOS_FREQ = 2700; // ~peak loudness for typical Elegoo piezo
 
 Adafruit_MPU6050 mpu;
 
@@ -44,6 +46,74 @@ bool identifyMPU6050()
   return false; // If no response, return false
 }
 
+void playTone(int pin, int freq, int duration_ms)
+{
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  // v3.x API — pin-addressed
+  ledcAttach(pin, freq, 8);
+  ledcWrite(pin, 128); // 50% duty cycle (max volume for a piezo)
+  delay(duration_ms);
+  ledcWrite(pin, 0);
+  ledcDetach(pin);
+#else
+  // v2.x API — channel-addressed
+  const int channel = 0;       // ESP32 has 16 LEDC channels (0–15)
+  ledcSetup(channel, freq, 8); // configure channel: frequency Hz, 8-bit resolution
+  ledcAttachPin(pin, channel); // route channel output to the pin
+  ledcWrite(channel, 128);     // 50% duty cycle
+  delay(duration_ms);
+  ledcWrite(channel, 0);
+  ledcDetachPin(pin);
+#endif
+}
+
+void play_sos_pattern()
+{
+  // 3 short beeps (200 ms each, 200 ms gap)
+  for (int i = 0; i < 3; i++)
+  {
+    playTone(BUZZER_PIN, SOS_FREQ, 200);
+    delay(400); // 200 ms tone + 200 ms silence
+  }
+  delay(200);
+
+  // 3 long beeps (600 ms each, 200 ms gap) — Morse "O"
+  for (int i = 0; i < 3; i++)
+  {
+    playTone(BUZZER_PIN, SOS_FREQ, 600);
+    delay(800);
+  }
+  delay(200);
+
+  // 3 short beeps again
+  for (int i = 0; i < 3; i++)
+  {
+    playTone(BUZZER_PIN, SOS_FREQ, 200);
+    delay(400);
+  }
+}
+
+void play_cancellation_chirp()
+{
+  // Two quick high-frequency chirps; suggest urgency without being alarm-fatigue-y
+  tone(BUZZER_PIN, 3000, 100);
+  delay(150);
+  tone(BUZZER_PIN, 3000, 100);
+  delay(900); // most of the second is silence, so it's not annoying
+}
+
+void find_resonance()
+{
+  Serial.println("Listening for the loudest pitch...");
+  for (int f = 1500; f <= 4500; f += 100)
+  {
+    Serial.printf("  %d Hz\n", f);
+    playTone(BUZZER_PIN, f, 400);
+    delay(200);
+  }
+  Serial.println("Done — pick the loudest one.");
+}
+
 void setup()
 {
   // put your setup code here, to run once:
@@ -80,6 +150,23 @@ void setup()
   Serial.println("# RakshaBand IMU Logger v1");
   Serial.println("# sensor=ICM-42670-P accel_range=8g gyro_range=500dps rate=100Hz");
   Serial.println("t_ms,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps");
+
+  // Now identify the passive buzzer
+  pinMode(BUZZER_PIN, OUTPUT);
+  Serial.println("Beep at 2000 Hz...");
+  playTone(BUZZER_PIN, 2000, 500);
+  delay(700);
+
+  // Serial.println("Sweep 500-3000 Hz...");
+  for (int f = 500; f <= 3000; f += 30)
+  {
+    playTone(BUZZER_PIN, f, 20);
+    delay(20);
+  }
+
+  // find_resonance();
+
+  Serial.println("Buzzer Done");
 }
 
 const float G_TO_MS2 = 9.80665f; // Conversion factor from g to m/s^2
@@ -146,6 +233,7 @@ void loop()
       post_fall_remaining = POST_FALL_HOLD_SAMPLES;
       digitalWrite(LED_PIN, HIGH); // Turn on LED to indicate fall detected
       // Serial.printf("# Fall candidate detected, peak ~%0.2fg\n", accelMagnitude);
+      play_sos_pattern();
     }
     else
     {
